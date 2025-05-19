@@ -3,6 +3,20 @@ A application of FIFO, LRU, and optimal (OPT) page-replacement algorithms for my
 
 -Nagtalon, Steven Vash
 
-## Windows SmartScreen Warning
-If you see "Windows protected your PC", click "More info" → "Run anyway".
-The app is open-source
+# Run the page-replacement-simulator.exe
+
+# How to Build
+
+1. Install [Node.js](https://nodejs.org/)
+2. Clone this repo:
+   ```bash
+   git clone https://github.com/yourusername/page-replacement-simulator.git
+   ```
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+4. Build executables:
+   ```bash
+   npm run dist
+   ```
