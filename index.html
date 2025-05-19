@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Replacement Algorithm Simulator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .result-card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            height: 100%;
+        }
+        .algorithm-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .page-fault {
+            color: red;
+            font-weight: bold;
+        }
+        .page-hit {
+            color: rgb(206, 27, 27);
+        }
+        .reference-string {
+            font-family: monospace;
+            font-size: 1.1em;
+        }
+        .frame-display {
+            min-height: 100px;
+            border: 1px solid #111111;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .results-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-right: -15px;
+            margin-left: -15px;
+        }
+        .result-column {
+            padding-right: 15px;
+            padding-left: 15px;
+            flex: 0 0 33.333333%;
+            max-width: 33.333333%;
+        }
+        @media (max-width: 992px) {
+            .result-column {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4"><strong>Page Replacement Algorithm Simulator</strong></h1>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">
+                <h2 class="h5 mb-0">Configuration</h2>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="frameCount" class="form-label">Number of Page Frames</label>
+                            <input type="number" class="form-control" id="frameCount" min="1" max="10" value="3" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="refLength" class="form-label">Reference String Length</label>
+                            <input type="number" class="form-control" id="refLength" min="5" max="30" value="15" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="customRefString" class="form-label">Or enter custom reference string (0-9, comma separated)</label>
+                        <input type="text" class="form-control" id="customRefString" placeholder="e.g., 1,2,3,4,1,2,5,1,2,3,4,5" pattern="^[\d,\s]+$">
+                    </div>
+                    <button type="submit" class="btn btn-dark text-white">Generate & Run Simulations</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-dark text-white">
+                <h2 class="h5 mb-0">Reference String</h2>
+            </div>
+            <div class="card-body">
+                <div id="referenceStringDisplay" class="reference-string"></div>
+            </div>
+        </div>
+        
+        <div id="resultsContainer" class="results-row">
+            <!-- Results will be inserted here in 3 columns -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+const configForm = document.getElementById('configForm');
+const refStringDisplay = document.getElementById('referenceStringDisplay');
+const resultsContainer = document.getElementById('resultsContainer');
+
+configForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    // Get configuration values
+    const frameCount = parseInt(document.getElementById('frameCount').value);
+    const refLength = parseInt(document.getElementById('refLength').value);
+    const customRefString = document.getElementById('customRefString').value.trim();
+
+    // Generate or use custom reference string (0-9 only)
+    let referenceString;
+    if (customRefString) {
+        referenceString = customRefString.split(',')
+            .map(num => parseInt(num.trim()))
+            .filter(num => !isNaN(num) && num >= 0 && num <= 9);
+
+        if (referenceString.length === 0) {
+            alert('Please enter valid page numbers between 0-9');
+            return;
+        }
+    } else {
+        referenceString = generateRandomReferenceString(refLength);
+    }
+
+    // Display reference string
+    refStringDisplay.textContent = referenceString.join(', ');
+
+    // Run simulations
+    runSimulations(referenceString, frameCount);
+});
+
+// Generate random reference string (0-9 only)
+function generateRandomReferenceString(length) {
+    const refString = [];
+    for (let i = 0; i < length; i++) {
+        refString.push(Math.floor(Math.random() * 10)); // 0-9
+    }
+    return refString;
+}
+
+// Run all simulations and display results
+function runSimulations(referenceString, frameCount) {
+    resultsContainer.innerHTML = '';
+
+    // Create columns for each algorithm
+    const algorithms = [
+        { name: 'FIFO', func: simulateFIFO },
+        { name: 'LRU', func: simulateLRU },
+        { name: 'Optimal', func: simulateOPT }
+    ];
+
+    algorithms.forEach(algorithm => {
+        const column = document.createElement('div');
+        column.className = 'result-column';
+        
+        const results = algorithm.func(referenceString, frameCount);
+        const card = createResultCard(algorithm.name, referenceString, frameCount, results);
+        
+        column.appendChild(card);
+        resultsContainer.appendChild(column);
+    });
+}
+
+// Create result card for an algorithm
+function createResultCard(algorithmName, referenceString, frameCount, results) {
+    const card = document.createElement('div');
+    card.className = 'card result-card';
+
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'card-header bg-dark text-white';
+    cardHeader.innerHTML = `<h2 class="h5 mb-0">${algorithmName} Algorithm</h2>`;
+
+    const cardBody = document.createElement('div');
+    cardBody.className = 'card-body';
+
+    // Summary
+    const summary = document.createElement('div');
+    summary.className = 'mb-3';
+    summary.innerHTML = `
+                <p><strong>Page Frames:</strong> ${frameCount}</p>
+                <p><strong>Total Page Faults:</strong> <span class="page-fault">${results.pageFaults}</span></p>
+                <p><strong>Fault Rate:</strong> ${(results.pageFaults / referenceString.length * 100).toFixed(1)}%</p>
+            `;
+
+    // Animation steps
+    const animationTitle = document.createElement('h5');
+    animationTitle.className = 'mt-4';
+    animationTitle.textContent = 'Simulation Steps:';
+
+    const animationContainer = document.createElement('div');
+    animationContainer.className = 'mb-3';
+
+    // Create steps
+    results.steps.forEach((step, index) => {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'mb-3 p-2 border rounded';
+
+        const stepHeader = document.createElement('div');
+        stepHeader.className = 'd-flex justify-content-between mb-2';
+        stepHeader.innerHTML = `
+                    <strong>Step ${index + 1}:</strong>
+                    <span>Accessing page <strong>${referenceString[index]}</strong></span>
+                    <span class="${step.fault ? 'page-fault' : 'page-hit'}">
+                        ${step.fault ? 'Page Fault' : 'Page Hit'}
+                    </span>
+                `;
+
+        const framesDiv = document.createElement('div');
+        framesDiv.className = 'frame-display';
+
+        // Display frames
+        const framesList = document.createElement('div');
+        framesList.className = 'd-flex gap-2';
+
+        step.frames.forEach((frame, i) => {
+            const frameElement = document.createElement('div');
+            frameElement.className = 'border p-2 text-center';
+            frameElement.style.width = '50px';
+            frameElement.textContent = frame === null ? '-' : frame;
+            if (frame !== null && step.replaced === i && step.fault) {
+                frameElement.classList.add('bg-warning');
+            }
+            framesList.appendChild(frameElement);
+        });
+
+        // Display info
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'mt-2 small text-muted';
+
+        if (step.fault) {
+            if (step.replaced !== null) {
+                infoDiv.textContent = `Replaced page ${step.replacedPage} in frame ${step.replaced + 1}`;
+            } else {
+                infoDiv.textContent = 'Added to empty frame';
+            }
+        } else {
+            infoDiv.textContent = 'Page found in memory';
+        }
+
+        framesDiv.appendChild(framesList);
+        framesDiv.appendChild(infoDiv);
+        stepDiv.appendChild(stepHeader);
+        stepDiv.appendChild(framesDiv);
+        animationContainer.appendChild(stepDiv);
+    });
+
+    cardBody.appendChild(summary);
+    cardBody.appendChild(animationTitle);
+    cardBody.appendChild(animationContainer);
+    card.appendChild(cardHeader);
+    card.appendChild(cardBody);
+    
+    return card;
+}
+
+// FIFO Algorithm
+function simulateFIFO(referenceString, frameCount) {
+    const frames = Array(frameCount).fill(null);
+    const queue = []; // To track the order of page insertion
+    let pageFaults = 0;
+    const steps = [];
+
+    for (let i = 0; i < referenceString.length; i++) {
+        const page = referenceString[i];
+        const step = {
+            frames: [...frames],
+            fault: false,
+            replaced: null,
+            replacedPage: null
+        };
+
+        if (!frames.includes(page)) {
+            // Page fault occurred
+            pageFaults++;
+            step.fault = true;
+
+            if (frames.includes(null)) {
+                // There's an empty frame
+                const emptyIndex = frames.indexOf(null);
+                frames[emptyIndex] = page;
+                queue.push(emptyIndex);
+                step.replaced = emptyIndex;
+            } else {
+                // Replace the oldest page (FIFO)
+                const replaceIndex = queue.shift();
+                step.replacedPage = frames[replaceIndex];
+                frames[replaceIndex] = page;
+                queue.push(replaceIndex);
+                step.replaced = replaceIndex;
+            }
+        }
+
+        steps.push(step);
+    }
+
+    return { pageFaults, steps };
+}
+
+// LRU Algorithm
+function simulateLRU(referenceString, frameCount) {
+    const frames = Array(frameCount).fill(null);
+    const lastUsed = {}; // Track when each page was last used
+    let pageFaults = 0;
+    const steps = [];
+    let time = 0;
+
+    for (let i = 0; i < referenceString.length; i++) {
+        const page = referenceString[i];
+        const step = {
+            frames: [...frames],
+            fault: false,
+            replaced: null,
+            replacedPage: null
+        };
+
+        if (frames.includes(page)) {
+            // Page hit - update last used time
+            lastUsed[page] = time;
+        } else {
+            // Page fault occurred
+            pageFaults++;
+            step.fault = true;
+
+            if (frames.includes(null)) {
+                // There's an empty frame
+                const emptyIndex = frames.indexOf(null);
+                frames[emptyIndex] = page;
+                lastUsed[page] = time;
+                step.replaced = emptyIndex;
+            } else {
+                // Find the least recently used page
+                let lruPage = null;
+                let lruTime = Infinity;
+                let replaceIndex = -1;
+
+                for (let j = 0; j < frames.length; j++) {
+                    const framePage = frames[j];
+                    if (lastUsed[framePage] < lruTime) {
+                        lruTime = lastUsed[framePage];
+                        lruPage = framePage;
+                        replaceIndex = j;
+                    }
+                }
+
+                // Replace the LRU page
+                step.replacedPage = frames[replaceIndex];
+                delete lastUsed[frames[replaceIndex]];
+                frames[replaceIndex] = page;
+                lastUsed[page] = time;
+                step.replaced = replaceIndex;
+            }
+        }
+
+        time++;
+        steps.push(step);
+    }
+
+    return { pageFaults, steps };
+}
+
+// Optimal Algorithm
+function simulateOPT(referenceString, frameCount) {
+    const frames = Array(frameCount).fill(null);
+    let pageFaults = 0;
+    const steps = [];
+
+    for (let i = 0; i < referenceString.length; i++) {
+        const page = referenceString[i];
+        const step = {
+            frames: [...frames],
+            fault: false,
+            replaced: null,
+            replacedPage: null
+        };
+
+        if (!frames.includes(page)) {
+            // Page fault occurred
+            pageFaults++;
+            step.fault = true;
+
+            if (frames.includes(null)) {
+                // There's an empty frame
+                const emptyIndex = frames.indexOf(null);
+                frames[emptyIndex] = page;
+                step.replaced = emptyIndex;
+            } else {
+                // Find the page that won't be used for the longest time
+                let farthest = i;
+                let replaceIndex = 0;
+
+                for (let j = 0; j < frames.length; j++) {
+                    const framePage = frames[j];
+                    let k;
+
+                    // Find next use of this page
+                    for (k = i + 1; k < referenceString.length; k++) {
+                        if (referenceString[k] === framePage) {
+                            break;
+                        }
+                    }
+
+                    // If page isn't used again, replace it
+                    if (k === referenceString.length) {
+                        replaceIndex = j;
+                        break;
+                    }
+
+                    // Otherwise track the farthest used page
+                    if (k > farthest) {
+                        farthest = k;
+                        replaceIndex = j;
+                    }
+                }
+
+                // Replace the optimal page
+                step.replacedPage = frames[replaceIndex];
+                frames[replaceIndex] = page;
+                step.replaced = replaceIndex;
+            }
+        }
+
+        steps.push(step);
+    }
+
+    return { pageFaults, steps };
+}
+});
+
+    </script>
+
+</body>
+</html>
