@@ -4,6 +4,7 @@ A application of FIFO, LRU, and optimal (OPT) page-replacement algorithms for my
 -Nagtalon, Steven Vash
 
 # Run the page-replacement-simulator.exe
+1. Download it thru releases
 
 # How to Build
 
